@@ -19,18 +19,24 @@ public class StudentServiceImpl implements StudentService {
 	
 	private final StudentRepository studentRepository;
 	private final ReportsRepository reportsRepository;
-	
-	private Student save(Student student) {
-		if(student == null) {
-			throw new NullPointerException("student is null");
-		}
-		return studentRepository.save(student);
-	}
 
 	@Override
 	public Student createStudent(Student student) {
 		// TODO Auto-generated method stub
-		return save(student);
+		if(student == null) {
+			throw new NullPointerException("student is null");
+		}
+		Student newStudent = studentRepository.save(student);
+		List<Report> reportList = student.getReports();
+		
+		if(!reportList.isEmpty()) {
+			List<Report> savedList = (List<Report>) reportsRepository.saveAll(reportList);
+			for (Report report : savedList) {
+				report.setStudent(newStudent);
+				reportsRepository.save(report);
+			}
+		}
+		return newStudent;
 	}
 
 	@Override
@@ -52,11 +58,19 @@ public class StudentServiceImpl implements StudentService {
 		student.setState(newStudent.getState());
 		student.setHobby(newStudent.getHobby());
 		
+		if(!student.getReports().isEmpty()) {
+			for (Report report : student.getReports()) {
+				report.setStudent(null);
+				reportsRepository.delete(report);
+			}
+		}
 		student.getReports().clear();
 		List<Report> newReportList = new ArrayList<>();
-		for (Report report : newStudent.getReports()) {
-			report.setStudent(student);
-			newReportList.add(reportsRepository.save(report));
+		if(!newStudent.getReports().isEmpty()) {
+			for (Report report : newStudent.getReports()) {
+				report.setStudent(student);
+				newReportList.add(reportsRepository.save(report));
+			}
 		}
 		student.setReports(newReportList);
 		return studentRepository.save(student);
@@ -81,14 +95,16 @@ public class StudentServiceImpl implements StudentService {
 	@Override
 	public boolean deleteStudentById(Long id) {
 		// TODO Auto-generated method stub
-		if(id == null) {
-			System.out.println("student id is null");
-			return false;
-		}
-		if(studentRepository.findById(id).isEmpty()) {
+		Optional<Student> studentOpt = studentRepository.findById(id);
+		if(studentOpt.isEmpty()) {
 			System.out.println("student id "+id+" is not found.");
 			return false;
 		}
+		List<Report> reportList = reportsRepository.findByStudent(studentOpt.get());
+		if(!reportList.isEmpty()) {
+			reportsRepository.deleteAll(reportList);
+		}
+		studentRepository.deleteById(id);
 		return true;
 	}
 

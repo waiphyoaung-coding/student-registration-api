@@ -49,7 +49,7 @@ public class Report {
 	@Min(value = 0,message = "total must not be negative")
 	private Integer total;
 	
-	@ManyToOne(fetch = FetchType.LAZY, cascade = CascadeType.REMOVE)
+	@ManyToOne(fetch = FetchType.LAZY, cascade = CascadeType.ALL)
 	@JoinColumn(name = "student_id")
 	@JsonIgnore
 	private Student student;

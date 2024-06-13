@@ -35,6 +35,9 @@ public class Student {
 	@GeneratedValue(strategy = GenerationType.IDENTITY)
 	private Long id;
 	
+	@NotBlank(message = "StudentID is required")
+	private String studentID;
+	
 	@NotBlank(message = "name is required")
 	private String name;
 	
@@ -59,8 +62,7 @@ public class Student {
 	@Enumerated(EnumType.STRING)
 	private State state;
 	
-	@Enumerated(EnumType.STRING)
-	private Hobby hobby;
+	private List<String> hobby;
 	
 	private LocalDateTime createdAt;
 	private LocalDateTime updatedAt;
