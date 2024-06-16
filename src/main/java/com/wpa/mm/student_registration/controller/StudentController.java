@@ -1,8 +1,10 @@
 package com.wpa.mm.student_registration.controller;
 
+import java.io.ByteArrayInputStream;
 import java.util.List;
 import java.util.Optional;
 
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.BindingResult;
@@ -14,11 +16,14 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
 import com.wpa.mm.student_registration.domain.Student;
 import com.wpa.mm.student_registration.service.MapValidationService;
 import com.wpa.mm.student_registration.service.StudentService;
+import com.wpa.mm.student_registration.util.ExcelHelper;
 
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -70,5 +75,39 @@ public class StudentController {
 		}
 		return new ResponseEntity<Long>(studentId, HttpStatus.OK);
 	}
+	
+	@PostMapping("/import")
+    public ResponseEntity<?> importStudents(@RequestParam("file") MultipartFile file) {
+        if (ExcelHelper.hasExcelFormat(file)) {
+            studentService.save(file);
+            return ResponseEntity.ok().build();
+        } else {
+            throw new RuntimeException("Please upload an excel file!");
+        }
+    }
+
+    @GetMapping("/export")
+    public ResponseEntity<byte[]> exportStudents() {
+        ByteArrayInputStream in = studentService.load();
+        HttpHeaders headers = new HttpHeaders();
+        headers.add("Content-Disposition", "attachment; filename=students.xlsx");
+
+        return ResponseEntity
+                .ok()
+                .headers(headers)
+                .body(in.readAllBytes());
+    }
+    
+    @GetMapping("/export/{studentId}")
+    public ResponseEntity<byte[]> exportStudentById(@PathVariable long studentId) {
+        ByteArrayInputStream in = studentService.loadById(studentId);
+        HttpHeaders headers = new HttpHeaders();
+        headers.add("Content-Disposition", "attachment; filename=students.xlsx");
+
+        return ResponseEntity
+                .ok()
+                .headers(headers)
+                .body(in.readAllBytes());
+    }
 	
 }
