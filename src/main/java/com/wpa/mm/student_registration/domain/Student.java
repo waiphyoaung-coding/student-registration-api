@@ -80,4 +80,12 @@ public class Student {
 		this.updatedAt = LocalDateTime.now();
 	}
 
+	@Override
+	public String toString() {
+		return "Student [id=" + id + ", studentID=" + studentID + ", name=" + name + ", nrc=" + nrc + ", email=" + email
+				+ ", phonenumber=" + phonenumber + ", address=" + address + ", dob=" + dob + ", gender=" + gender
+				+ ", state=" + state + ", hobby=" + hobby + ", createdAt=" + createdAt + ", updatedAt=" + updatedAt
+				+ ", reports=" + reports + "]";
+	}
+
 }

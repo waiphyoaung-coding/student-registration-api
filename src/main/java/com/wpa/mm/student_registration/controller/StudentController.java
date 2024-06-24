@@ -31,7 +31,7 @@ import lombok.RequiredArgsConstructor;
 @RestController
 @RequestMapping("/api/student")
 @RequiredArgsConstructor
-@CrossOrigin("http://localhost:3000")
+@CrossOrigin(origins = {"http://localhost:3000","http://localhost:4200"})
 public class StudentController {
 
 	private final StudentService studentService;
@@ -78,11 +78,11 @@ public class StudentController {
 	
 	@PostMapping("/import")
     public ResponseEntity<?> importStudents(@RequestParam("file") MultipartFile file) {
-        if (ExcelHelper.hasExcelFormat(file)) {
-            studentService.save(file);
-            return ResponseEntity.ok().build();
+        if (ExcelHelper.hasExcelFormat(file) && ExcelHelper.validateExcelFile(file)) {
+            
+            return new ResponseEntity<List<Student>>(studentService.save(file), HttpStatus.OK);
         } else {
-            throw new RuntimeException("Please upload an excel file!");
+            return ResponseEntity.badRequest().build();
         }
     }
 
@@ -108,6 +108,17 @@ public class StudentController {
                 .ok()
                 .headers(headers)
                 .body(in.readAllBytes());
+    }
+    
+    @GetMapping("/excel")
+    public ResponseEntity<byte[]> generateExcelFile(){
+    	ByteArrayInputStream in = studentService.generateFile();
+    	HttpHeaders headers = new HttpHeaders();
+    	headers.add("Content-Disposition", "attachment; filename=students.xlsx");
+    	return ResponseEntity
+    			.ok()
+    			.headers(headers)
+    			.body(in.readAllBytes());
     }
 	
 }

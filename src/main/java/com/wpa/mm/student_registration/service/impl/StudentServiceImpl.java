@@ -3,23 +3,33 @@ package com.wpa.mm.student_registration.service.impl;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.time.ZoneId;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Date;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Optional;
 
+import org.apache.poi.ss.usermodel.Cell;
+import org.apache.poi.ss.usermodel.CellStyle;
+import org.apache.poi.ss.usermodel.CreationHelper;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.Workbook;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
+import com.wpa.mm.student_registration.domain.Gender;
 import com.wpa.mm.student_registration.domain.Report;
+import com.wpa.mm.student_registration.domain.State;
 import com.wpa.mm.student_registration.domain.Student;
 import com.wpa.mm.student_registration.repository.ReportsRepository;
 import com.wpa.mm.student_registration.repository.StudentRepository;
 import com.wpa.mm.student_registration.service.StudentService;
-import com.wpa.mm.student_registration.util.ExcelHelper;
 
 import lombok.RequiredArgsConstructor;
 @Service
@@ -117,15 +127,129 @@ public class StudentServiceImpl implements StudentService {
 		return true;
 	}
 	
-	public void save(MultipartFile file) {
+	@Override
+	public List<Student> save(MultipartFile file) {
+	    Logger logger = LoggerFactory.getLogger(this.getClass());
+	    List<Student> studentList = new ArrayList<>();
         try {
-            List<Student> students = ExcelHelper.excelToStudents(file.getInputStream());
-            studentRepository.saveAll(students);
-            List<Report> reports = ExcelHelper.excelToReports(file.getInputStream());
-            reportsRepository.saveAll(reports);
+            Workbook workbook = new XSSFWorkbook(file.getInputStream());
+            
+					Sheet sheet = workbook.getSheetAt(0);
+					
+					Iterator<Row> rows = sheet.iterator();
+		            int rowNumber = 0;
+		            while (rows.hasNext()) {
+		                Row currentRow = rows.next();
+
+		                // skip header
+		                if (rowNumber == 0) {
+		                    rowNumber++;
+		                    continue;
+		                }
+
+		                Iterator<Cell> cellsInRow = currentRow.iterator();
+
+		                Student student = new Student();
+		                Report report = new Report();
+
+		                int cellIdx = 0;
+		                while (cellsInRow.hasNext()) {
+		                    Cell currentCell = cellsInRow.next();
+
+		                    switch (cellIdx) {
+		                        case 0:
+		                            student.setStudentID(currentCell.getStringCellValue());
+		                            break;
+		                        case 1:
+		                            student.setName(currentCell.getStringCellValue());
+		                            break;
+		                        case 2:
+		                            student.setNrc(currentCell.getStringCellValue());
+		                            break;
+		                        case 3:
+		                            student.setDob(currentCell.getLocalDateTimeCellValue().toLocalDate());
+		                            break;
+		                        case 4:
+		                            student.setGender(Gender.valueOf(currentCell.getStringCellValue().toUpperCase()));
+		                            break;
+		                        case 5:
+		                            student.setState(State.valueOf(currentCell.getStringCellValue().toUpperCase()));
+		                            break;
+		                        case 6:
+		                            student.setPhonenumber((int) currentCell.getNumericCellValue());
+		                            break;
+		                        case 7:
+		                            student.setEmail(currentCell.getStringCellValue());
+		                            break;
+		                        case 8:
+		                            student.setAddress(currentCell.getStringCellValue());
+		                            break;
+		                        case 9:
+		                        	String hobbies = currentCell.getStringCellValue();
+		                        	String[] hobbyList = hobbies.split(",");
+		                        	student.setHobby(Arrays.asList(hobbyList));
+		                            break;
+		                        case 10:
+		                        	report.setMyanmar((int) currentCell.getNumericCellValue());
+		                        	break;
+		                        case 11:
+		                        	report.setEnglish((int) currentCell.getNumericCellValue());
+		                        	break;
+		                        case 12:
+		                        	report.setMathematic((int) currentCell.getNumericCellValue());
+		                        	break;
+		                        case 13:
+		                        	report.setHistory((int) currentCell.getNumericCellValue());
+		                        	break;
+		                        case 14:
+		                        	report.setScience((int) currentCell.getNumericCellValue());
+		                        	break;
+		                        case 15:
+		                        	report.setTotal((int) currentCell.getNumericCellValue());
+		                        	break;
+		                        case 16:
+		                        	report.setAcademicYear((int) currentCell.getNumericCellValue());
+		                        	break;
+		                        default:
+		                            break;
+		                    }
+
+		                    cellIdx++;
+		                }
+		                if (student.getStudentID() == null || student.getStudentID().isEmpty() ||
+		                        student.getName() == null || student.getName().isEmpty() ||
+		                        student.getNrc() == null || student.getNrc().isEmpty() ||
+		                        student.getDob() == null ||
+		                        student.getAddress() == null || student.getAddress().isEmpty()) {
+		                        logger.error("Missing required field in row {}: {}", rowNumber, currentRow);
+		                        continue; // skip this record
+		                    }
+		                
+		               Optional<Student> studentOpt = studentRepository.findByStudentID(student.getStudentID());
+		               if(report.getAcademicYear() != null) {
+		            	   if(studentOpt.isEmpty()) {
+				               Student newStudent = studentRepository.save(student);
+				               report.setStudent(newStudent);
+				               studentList.add(newStudent);
+			               }else {
+			            	   report.setStudent(studentOpt.get());
+			            	   studentList.add(student);
+			               }
+			               Report newReport = reportsRepository.save(report);
+			               student.getReports().add(newReport);
+		               }else {
+		            	   if(studentOpt.isEmpty()) {
+				               studentRepository.save(student);
+				               studentList.add(student);
+			               }
+		               }
+		            }
+
+            workbook.close();
         } catch (IOException e) {
             throw new RuntimeException("fail to store excel data: " + e.getMessage());
         }
+		return studentList;
     }
 
     public ByteArrayInputStream load() {
@@ -133,8 +257,6 @@ public class StudentServiceImpl implements StudentService {
 
         try (Workbook workbook = new XSSFWorkbook()) {
             Sheet sheet = workbook.createSheet("Students");
-            Sheet sheet2 = workbook.createSheet("Reports");
-
             Row headerRow = sheet.createRow(0);
 
             headerRow.createCell(0).setCellValue("ID");
@@ -148,46 +270,67 @@ public class StudentServiceImpl implements StudentService {
             headerRow.createCell(8).setCellValue("Address");
             headerRow.createCell(9).setCellValue("Hobby");
 
+            headerRow.createCell(10).setCellValue("Myanmar");
+            headerRow.createCell(11).setCellValue("English");
+            headerRow.createCell(12).setCellValue("Mathematic");
+            headerRow.createCell(13).setCellValue("History");
+            headerRow.createCell(14).setCellValue("Science");
+            headerRow.createCell(15).setCellValue("Total");
+            headerRow.createCell(16).setCellValue("Year");
+            CreationHelper creationHelper = workbook.getCreationHelper();
+            CellStyle dateCellStyle = workbook.createCellStyle();
+            short dateFormat = creationHelper.createDataFormat().getFormat("yyyy-MM-dd");
+            dateCellStyle.setDataFormat(dateFormat);
+            
             int rowIdx = 1;
             for (Student student : students) {
-                Row row = sheet.createRow(rowIdx++);
+            	List<Report> reportList = reportsRepository.findByStudent(student);
+            	
+            	if(!reportList.isEmpty()) {
 
-                row.createCell(0).setCellValue(student.getStudentID());
-                row.createCell(1).setCellValue(student.getName());
-                row.createCell(2).setCellValue(student.getNrc());
-                row.createCell(3).setCellValue(student.getDob());
-                row.createCell(4).setCellValue(student.getGender().toString());
-                row.createCell(5).setCellValue(student.getState().toString());
-                row.createCell(6).setCellValue(student.getPhonenumber());
-                row.createCell(7).setCellValue(student.getEmail());
-                row.createCell(8).setCellValue(student.getAddress());
-                row.createCell(9).setCellValue(String.join(",", student.getHobby()));
+                    for (Report report : reportList) {
+                        Row row = sheet.createRow(rowIdx++);
+	                    row.createCell(0).setCellValue(student.getStudentID());
+	                    row.createCell(1).setCellValue(student.getName());
+	                    row.createCell(2).setCellValue(student.getNrc());
+	                    
+	                    Cell cell = row.createCell(3);
+	                    Date date = Date.from(student.getDob().atStartOfDay(ZoneId.systemDefault()).toInstant());
+	                    cell.setCellValue(date);
+	                    cell.setCellStyle(dateCellStyle);
+	                    
+	                    row.createCell(4).setCellValue(student.getGender().toString());
+	                    row.createCell(5).setCellValue(student.getState().toString());
+	                    row.createCell(6).setCellValue(student.getPhonenumber());
+	                    row.createCell(7).setCellValue(student.getEmail());
+	                    row.createCell(8).setCellValue(student.getAddress());
+	                    row.createCell(9).setCellValue(String.join(",", student.getHobby()));
+	                    
+	    				row.createCell(10).setCellValue(report.getMyanmar());
+	    				row.createCell(11).setCellValue(report.getEnglish());
+	    				row.createCell(12).setCellValue(report.getMathematic());
+	    				row.createCell(13).setCellValue(report.getHistory());
+	    				row.createCell(14).setCellValue(report.getScience());
+	    				row.createCell(15).setCellValue(report.getTotal());
+	    				row.createCell(16).setCellValue(report.getAcademicYear());
+					}
+                    
+            	}else {
+                    Row row = sheet.createRow(rowIdx++);
+
+                    row.createCell(0).setCellValue(student.getStudentID());
+                    row.createCell(1).setCellValue(student.getName());
+                    row.createCell(2).setCellValue(student.getNrc());
+                    row.createCell(3).setCellValue(student.getDob());
+                    row.createCell(4).setCellValue(student.getGender().toString());
+                    row.createCell(5).setCellValue(student.getState().toString());
+                    row.createCell(6).setCellValue(student.getPhonenumber());
+                    row.createCell(7).setCellValue(student.getEmail());
+                    row.createCell(8).setCellValue(student.getAddress());
+                    row.createCell(9).setCellValue(String.join(",", student.getHobby()));
+            	}
+            	
             }
-            
-            Row reportHeader = sheet2.createRow(0);
-            
-            reportHeader.createCell(0).setCellValue("StudentID");
-            reportHeader.createCell(1).setCellValue("Year");
-            reportHeader.createCell(2).setCellValue("Myanmar");
-            reportHeader.createCell(3).setCellValue("English");
-            reportHeader.createCell(4).setCellValue("Mathematic");
-            reportHeader.createCell(5).setCellValue("History");
-            reportHeader.createCell(6).setCellValue("Science");
-            reportHeader.createCell(7).setCellValue("Total");
-            
-            int rowIndx = 1;
-            for (Report report : reportsRepository.findAll()) {
-				Row row = sheet2.createRow(rowIndx++);
-				
-				row.createCell(0).setCellValue(report.getStudent().getStudentID());
-				row.createCell(1).setCellValue(report.getAcademicYear());
-				row.createCell(2).setCellValue(report.getMyanmar());
-				row.createCell(3).setCellValue(report.getEnglish());
-				row.createCell(4).setCellValue(report.getMathematic());
-				row.createCell(5).setCellValue(report.getHistory());
-				row.createCell(6).setCellValue(report.getScience());
-				row.createCell(7).setCellValue(report.getTotal());
-			}
 
             ByteArrayOutputStream out = new ByteArrayOutputStream();
             workbook.write(out);
@@ -206,59 +349,77 @@ public class StudentServiceImpl implements StudentService {
 		}
 		Student student = studentOpt.get();
 		try(Workbook workbook = new XSSFWorkbook();) {
-			Sheet sheet1 = workbook.createSheet("Students");
-			Sheet sheet2 = workbook.createSheet("Reports");
-			
-			Row headerRowStu = sheet1.createRow(0);
-			headerRowStu.createCell(0).setCellValue("ID");
-			headerRowStu.createCell(1).setCellValue("Name");
-			headerRowStu.createCell(2).setCellValue("NRC");
-			headerRowStu.createCell(3).setCellValue("DateOfBirth");
-			headerRowStu.createCell(4).setCellValue("Gender");
-			headerRowStu.createCell(5).setCellValue("State");
-			headerRowStu.createCell(6).setCellValue("Phone");
-			headerRowStu.createCell(7).setCellValue("Email");
-			headerRowStu.createCell(8).setCellValue("Address");
-			headerRowStu.createCell(9).setCellValue("Hobby");
-			
-			Row rowStu = sheet1.createRow(1);
-			rowStu.createCell(0).setCellValue(student.getStudentID());
-			rowStu.createCell(1).setCellValue(student.getName());
-			rowStu.createCell(2).setCellValue(student.getNrc());
-			rowStu.createCell(3).setCellValue(student.getDob());
-			rowStu.createCell(4).setCellValue(student.getGender().toString());
-			rowStu.createCell(5).setCellValue(student.getState().toString());
-			rowStu.createCell(6).setCellValue(student.getPhonenumber());
-			rowStu.createCell(7).setCellValue(student.getEmail());
-			rowStu.createCell(8).setCellValue(student.getAddress());
-			rowStu.createCell(9).setCellValue(String.join(",", student.getHobby()));
-			
-			Row reportHeader = sheet2.createRow(0);
-            reportHeader.createCell(0).setCellValue("StudentID");
-            reportHeader.createCell(1).setCellValue("Year");
-            reportHeader.createCell(2).setCellValue("Myanmar");
-            reportHeader.createCell(3).setCellValue("English");
-            reportHeader.createCell(4).setCellValue("Mathematic");
-            reportHeader.createCell(5).setCellValue("History");
-            reportHeader.createCell(6).setCellValue("Science");
-            reportHeader.createCell(7).setCellValue("Total");
+			Sheet sheet = workbook.createSheet("Students");
+            Row headerRow = sheet.createRow(0);
+
+            headerRow.createCell(0).setCellValue("ID");
+            headerRow.createCell(1).setCellValue("Name");
+            headerRow.createCell(2).setCellValue("NRC");
+            headerRow.createCell(3).setCellValue("DateOfBirth");
+            headerRow.createCell(4).setCellValue("Gender");
+            headerRow.createCell(5).setCellValue("State");
+            headerRow.createCell(6).setCellValue("Phone");
+            headerRow.createCell(7).setCellValue("Email");
+            headerRow.createCell(8).setCellValue("Address");
+            headerRow.createCell(9).setCellValue("Hobby");
+
+            headerRow.createCell(10).setCellValue("Myanmar");
+            headerRow.createCell(11).setCellValue("English");
+            headerRow.createCell(12).setCellValue("Mathematic");
+            headerRow.createCell(13).setCellValue("History");
+            headerRow.createCell(14).setCellValue("Science");
+            headerRow.createCell(15).setCellValue("Total");
+            headerRow.createCell(16).setCellValue("Year");
             
+            CreationHelper creationHelper = workbook.getCreationHelper();
+            CellStyle dateCellStyle = workbook.createCellStyle();
+            short dateFormat = creationHelper.createDataFormat().getFormat("yyyy-MM-dd");
+            dateCellStyle.setDataFormat(dateFormat);
+
             List<Report> reportList = reportsRepository.findByStudent(student);
-            if(!reportList.isEmpty()) {
-            	int rowIndx = 1;
+            int rowIdx = 1;
+        	if(!reportList.isEmpty()) {
+
                 for (Report report : reportList) {
-    				Row row = sheet2.createRow(rowIndx++);
-    				
-    				row.createCell(0).setCellValue(report.getStudent().getStudentID());
-    				row.createCell(1).setCellValue(report.getAcademicYear());
-    				row.createCell(2).setCellValue(report.getMyanmar());
-    				row.createCell(3).setCellValue(report.getEnglish());
-    				row.createCell(4).setCellValue(report.getMathematic());
-    				row.createCell(5).setCellValue(report.getHistory());
-    				row.createCell(6).setCellValue(report.getScience());
-    				row.createCell(7).setCellValue(report.getTotal());
-    			}
-            }
+                    Row row = sheet.createRow(rowIdx++);
+                    row.createCell(0).setCellValue(student.getStudentID());
+                    row.createCell(1).setCellValue(student.getName());
+                    row.createCell(2).setCellValue(student.getNrc());
+                    
+                    Cell cell = row.createCell(3);
+                    cell.setCellValue(student.getDob());
+                    cell.setCellStyle(dateCellStyle);
+                    
+                    row.createCell(4).setCellValue(student.getGender().toString());
+                    row.createCell(5).setCellValue(student.getState().toString());
+                    row.createCell(6).setCellValue(student.getPhonenumber());
+                    row.createCell(7).setCellValue(student.getEmail());
+                    row.createCell(8).setCellValue(student.getAddress());
+                    row.createCell(9).setCellValue(String.join(",", student.getHobby()));
+                    
+    				row.createCell(10).setCellValue(report.getMyanmar());
+    				row.createCell(11).setCellValue(report.getEnglish());
+    				row.createCell(12).setCellValue(report.getMathematic());
+    				row.createCell(13).setCellValue(report.getHistory());
+    				row.createCell(14).setCellValue(report.getScience());
+    				row.createCell(15).setCellValue(report.getTotal());
+    				row.createCell(16).setCellValue(report.getAcademicYear());
+				}
+                
+        	}else {
+                Row row = sheet.createRow(rowIdx++);
+
+                row.createCell(0).setCellValue(student.getStudentID());
+                row.createCell(1).setCellValue(student.getName());
+                row.createCell(2).setCellValue(student.getNrc());
+                row.createCell(3).setCellValue(student.getDob());
+                row.createCell(4).setCellValue(student.getGender().toString());
+                row.createCell(5).setCellValue(student.getState().toString());
+                row.createCell(6).setCellValue(student.getPhonenumber());
+                row.createCell(7).setCellValue(student.getEmail());
+                row.createCell(8).setCellValue(student.getAddress());
+                row.createCell(9).setCellValue(String.join(",", student.getHobby()));
+        	}
             
             ByteArrayOutputStream out = new ByteArrayOutputStream();
             workbook.write(out);
@@ -267,5 +428,40 @@ public class StudentServiceImpl implements StudentService {
             throw new RuntimeException("fail to import data to Excel file: " + e.getMessage());
         }
 	}
+
+	@Override
+	public ByteArrayInputStream generateFile() {
+		// TODO Auto-generated method stub
+		try(Workbook workbook = new XSSFWorkbook()) {
+			Sheet sheet = workbook.createSheet("Students");
+			Row headerRow = sheet.createRow(0);
+			
+			headerRow.createCell(0).setCellValue("ID");
+            headerRow.createCell(1).setCellValue("Name");
+            headerRow.createCell(2).setCellValue("NRC");
+            headerRow.createCell(3).setCellValue("DateOfBirth");
+            headerRow.createCell(4).setCellValue("Gender");
+            headerRow.createCell(5).setCellValue("State");
+            headerRow.createCell(6).setCellValue("Phone");
+            headerRow.createCell(7).setCellValue("Email");
+            headerRow.createCell(8).setCellValue("Address");
+            headerRow.createCell(9).setCellValue("Hobby");
+
+            headerRow.createCell(10).setCellValue("Myanmar");
+            headerRow.createCell(11).setCellValue("English");
+            headerRow.createCell(12).setCellValue("Mathematic");
+            headerRow.createCell(13).setCellValue("History");
+            headerRow.createCell(14).setCellValue("Science");
+            headerRow.createCell(15).setCellValue("Total");
+            headerRow.createCell(16).setCellValue("Year");
+            
+            ByteArrayOutputStream out = new ByteArrayOutputStream();
+            workbook.write(out);
+            return new ByteArrayInputStream(out.toByteArray());
+		} catch (IOException e) {
+            throw new RuntimeException("fail to import data to Excel file: " + e.getMessage());
+        }
+	}
+
 
 }

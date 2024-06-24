@@ -20,7 +20,7 @@ import lombok.RequiredArgsConstructor;
 @RestController
 @RequestMapping("api/report")
 @RequiredArgsConstructor
-@CrossOrigin("http://localhost:3000")
+@CrossOrigin(origins = {"http://localhost:3000","http://localhost:4200"})
 public class ReportController {
 	
 	private final ReportService reportService;

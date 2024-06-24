@@ -20,9 +20,12 @@ public interface StudentService {
 	
 	boolean deleteStudentById(Long id);
 	
-	void save(MultipartFile file);
+	List<Student> save(MultipartFile file);
 	
 	ByteArrayInputStream load();
 
 	ByteArrayInputStream loadById(Long studentId);
+	
+	ByteArrayInputStream generateFile();
+	
 }
