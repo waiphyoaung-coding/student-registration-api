@@ -56,6 +56,8 @@ public class Student {
 	@NotNull(message = "dob must not be null")
 	private LocalDate dob;
 	
+	private String imageName;
+	
 	@Enumerated(EnumType.STRING)
 	private Gender gender;
 	

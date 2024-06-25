@@ -67,6 +67,7 @@ public class StudentServiceImpl implements StudentService {
 		}
 		Student student = studentOpt.get();
 		student.setId(newStudent.getId());
+		student.setStudentID(newStudent.getStudentID());
 		student.setName(newStudent.getName());
 		student.setNrc(newStudent.getNrc());
 		student.setEmail(newStudent.getEmail());
@@ -76,6 +77,7 @@ public class StudentServiceImpl implements StudentService {
 		student.setGender(newStudent.getGender());
 		student.setState(newStudent.getState());
 		student.setHobby(newStudent.getHobby());
+		student.setImageName(newStudent.getImageName());
 		
 		if(!student.getReports().isEmpty()) {
 			for (Report report : student.getReports()) {

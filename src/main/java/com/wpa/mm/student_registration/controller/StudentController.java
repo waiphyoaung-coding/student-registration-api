@@ -1,11 +1,14 @@
 package com.wpa.mm.student_registration.controller;
 
 import java.io.ByteArrayInputStream;
+import java.io.IOException;
 import java.util.List;
 import java.util.Optional;
 
+import org.springframework.core.io.InputStreamResource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.BindingResult;
 import org.springframework.web.bind.annotation.CrossOrigin;
@@ -22,6 +25,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import com.wpa.mm.student_registration.domain.Student;
 import com.wpa.mm.student_registration.service.MapValidationService;
+import com.wpa.mm.student_registration.service.PDFService;
 import com.wpa.mm.student_registration.service.StudentService;
 import com.wpa.mm.student_registration.util.ExcelHelper;
 
@@ -36,6 +40,7 @@ public class StudentController {
 
 	private final StudentService studentService;
 	private final MapValidationService mapValidationService;
+	private final PDFService pdfService;
 	
 	@GetMapping("/fetch")
 	public ResponseEntity<List<Student>> getAllStudents(){
@@ -119,6 +124,27 @@ public class StudentController {
     			.ok()
     			.headers(headers)
     			.body(in.readAllBytes());
+    }
+    
+    @GetMapping("/pdf")
+    public ResponseEntity<InputStreamResource> exportPDF(){
+    	ByteArrayInputStream bis;
+		try {
+			bis = pdfService.generatePDF();
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.add("Content-Disposition", "inline; filename=students.pdf");
+
+        return ResponseEntity
+                .ok()
+                .headers(headers)
+                .contentType(MediaType.APPLICATION_PDF)
+                .body(new InputStreamResource(bis));
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+			return ResponseEntity.badRequest().build();
+		}
     }
 	
 }
